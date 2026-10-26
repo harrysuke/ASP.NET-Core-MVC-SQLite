@@ -29,11 +29,12 @@ RUN dotnet publish mvc/mvc.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-# curl exists only for the HEALTHCHECK below; the ASP.NET runtime image has no
-# HTTP client of its own. Removed package lists keep the layer small.
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
+# A static busybox supplies `wget` for the HEALTHCHECK below. The ASP.NET runtime
+# image ships no HTTP client, and `apt-get install curl` would make every build
+# depend on the distribution mirrors — which are unreachable from locked-down
+# build networks (archive.ubuntu.com:80 refused). A static binary avoids apt
+# entirely and adds ~1 MB.
+COPY --from=busybox:stable /bin/busybox /bin/busybox
 
 COPY --from=build /app/publish .
 
@@ -54,6 +55,6 @@ EXPOSE 8080
 
 # The landing page is [AllowAnonymous], so it is a valid unauthenticated probe.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
-    CMD curl --fail --silent --show-error http://localhost:8080/ || exit 1
+    CMD ["/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
 
 ENTRYPOINT ["dotnet", "mvc.dll"]

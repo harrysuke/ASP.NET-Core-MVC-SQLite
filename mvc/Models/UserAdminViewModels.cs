@@ -43,6 +43,14 @@ namespace mvc.Models
         [Display(Name = "Confirm password")]
         [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
         public string ConfirmPassword { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Access level granted on creation: <c>Admin</c> or <c>Member</c>.
+        /// Defaults to <c>Member</c> so a new account can at least use the catalog.
+        /// </summary>
+        [Required]
+        [Display(Name = "Access level")]
+        public string Role { get; set; } = "Member";
     }
 
     public class UserEditViewModel

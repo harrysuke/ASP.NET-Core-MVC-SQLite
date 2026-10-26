@@ -12,8 +12,11 @@ audit logging, analytics, and role-based authorization.
 - **Identity & Accounts** — register, login, logout, password reset, account profile
   (`AccountController`). Extended to allow resetting arbitrary users' passwords via
   `User/ResetPassword`.
-- **User management (Admin)** — `UserController` lists users with roles, create / edit /
-  delete, and reset passwords.
+- **User management (Admin)** — `UserController` (AdminOnly) lists users with their
+  access level, searchable/filterable, create with a chosen role, edit, reset passwords,
+  grant/revoke `Admin`/`Member`, lock/unlock, delete. Guard rails block self-demotion,
+  self-deletion, self-lock and removing the last admin; non-admins get
+  `/Account/AccessDenied`.
 - **Role-based authorization** —
   - Fallback policy: authenticated required on everything.
   - `MemberOnly` = `Admin` or `Member`.
@@ -292,8 +295,10 @@ or copy the file while the app is stopped (with WAL, also copy `-wal` and `-shm`
 - Password policy: RequireDigit, RequiredLength ≥ 6, RequireNonAlphanumeric = **false**,
   RequireUppercase (set inline in `Program.cs`).
 - Cookies via `ConfigureApplicationCookie`:
-  - `LoginPath` = `/Account/Login`
+  - `LoginPath` = `/Account/Login` — anonymous user hits a protected page.
   - `LogoutPath` = `/Account/Logout`
+  - `AccessDeniedPath` = `/Account/AccessDenied` — signed in, but the wrong role
+    (e.g. a `Member` opening `/User`).
 - Session cookie: 30-min idle timeout, `HttpOnly`, `IsEssential`.
 - Identity email services are wired to `EmailSender` (`IEmailSender<IdentityUser>`)
   via SMTP settings in `EmailSettings` (enables confirmation/reset emails).
@@ -304,6 +309,54 @@ Created in `SeedData` at startup and referenced by the authorization policies:
 
 - `Admin` — full control (user management, audit log, analytics/secret areas).
 - `Member` — normal logged-in members.
+
+## Access levels
+
+Every account is described by the roles it holds. The UI calls this the account's
+**access level**, and there are exactly three effective states:
+
+| Access level | Roles held | Can do |
+| --- | --- | --- |
+| Admin | `Admin` (+ `Member`) | Everything, including **user management** |
+| Member | `Member` | Books, dashboard, REST API, analytics, audit log |
+| No access | *(none)* | Signed in but blocked by every policy → `/Account/AccessDenied` |
+
+`/User` is the only screen that changes other people's access, and it is gated at the
+controller level (`[Authorize(Policy = "AdminOnly")]`) — the navbar/sidebar links are
+merely hidden for non-admins, they are not the security boundary.
+
+## User management (`/User`)
+
+Admin-only CRUD over Identity users, backed by `UserManager` / `RoleManager`:
+
+| Action | Route | Notes |
+| --- | --- | --- |
+| List + search | `GET /User?q=&role=` | Filter by email/username and by access level (`Admin`, `Member`, `None`) |
+| Create | `GET/POST /User/Create` | Choose the access level at creation time (`Member` is the default) |
+| Details | `GET /User/Details/{id}` | Roles, lockout state, confirmed email/phone, 2FA |
+| Edit | `GET/POST /User/Edit` | Email/username + phone; rejects duplicates |
+| Reset password | `GET/POST /User/ResetPassword` | Admin sets a new password directly (no email round-trip) |
+| Grant/revoke role | `POST /User/ToggleRole` | Only `Admin` / `Member` accepted; anything else → 400 |
+| Lock/unlock | `POST /User/ToggleLockout` | Sets `LockoutEnabled` + a 100-year `LockoutEnd` |
+| Delete | `GET/POST /User/Delete` | Confirmation page, then `DeleteAsync` |
+
+Guard rails, so an admin cannot lock themselves out of the system:
+
+- **No self-destruction** — you cannot delete your own account, remove the `Admin` role
+  from yourself, or lock yourself. Those menu items are also disabled in the UI.
+- **No last-admin removal** — `IsLastAdmin()` blocks deleting, demoting, or locking the
+  only remaining `Admin`.
+- **Audit trail** — every mutation writes an `AuditLogs` row via
+  `HttpContext.Items["AuditDetails"]`, e.g. *"Created user 'x@y' with role 'Admin'."*
+
+A `Member` (or a role-less account) that opens `/User` is bounced to
+`/Account/AccessDenied`, which shows the account's current roles and offers
+"Back to home" / "Sign in as a different user".
+
+`tests/user-management-smoke.py` exercises the whole flow against a running instance
+(admin login → create member → search/filter → member blocked → guard rails →
+lock/unlock → promote/demote → audit trail); it prints 47 pass/fail checks and exits
+non-zero on any failure. See the header of that file for how to point it at a stack.
 
 ## Authorization
 
@@ -707,7 +760,7 @@ destroy and recreate it freely, the catalog, users and audit log survive.
 | --- | --- |
 | `Dockerfile` | Two-stage build: `sdk:10.0` compiles, `aspnet:10.0` runs |
 | `.dockerignore` | Keeps `bin/`, `obj/`, docs and any local `.sqlite` file out of the context |
-| `docker-compose.yml` | Single-host deployment: port, volume, env vars, healthcheck |
+| `docker-compose.yml` | Single-host deployment: port, volume, env vars (healthcheck comes from the image) |
 | `.env.example` | Template for the compose variables (`cp .env.example .env`) |
 | `.github/workflows/docker-publish.yml` | Build → smoke test → push to Docker Hub |
 
@@ -752,14 +805,16 @@ docker run --rm -p 8080:8080 \
 - **Port 8080** (`ASPNETCORE_HTTP_PORTS=8080`). Plain HTTP inside the container — TLS is
   expected to terminate at your reverse proxy.
 - **Healthcheck** probes `GET /`, which is `[AllowAnonymous]`, every 30 s after a 25 s
-  start period.
+  start period. The probe is a **static `busybox` `wget`** copied into the image: the
+  ASP.NET runtime image has no HTTP client, and installing `curl` with `apt-get` would make
+  every build depend on the Ubuntu mirrors (see [build troubleshooting](#build-troubleshooting)).
 - **`ASPNETCORE_FORWARDEDHEADERS_ENABLED=true`** is set in compose so client IPs and
   scheme are taken from `X-Forwarded-*` when running behind nginx / Traefik / IIS ARR.
 
 Publish output is currently ~130 MB because the project still references build-time
 packages it does not use at runtime (`Microsoft.Build`, `NuGet.*`, `Microsoft.CodeAnalysis`,
 `Azure.Identity`). Dropping those from `mvc.csproj` would shrink both the publish output and
-the image considerably — worth doing if image size matters.
+the image (currently ~535 MB) considerably — worth doing if image size matters.
 
 ## Configuration
 
@@ -779,14 +834,21 @@ override `appsettings.json`.
 
 ## Backups
 
+The container must be stopped first, otherwise the `-wal` file may hold committed rows that
+are not yet in `booksDb.sqlite` (SQLite checkpoints the WAL on a clean shutdown):
+
 ```bash
-# consistent snapshot without stopping the app (SQLite VACUUM INTO)
-docker run --rm -v books-data:/data -v "$PWD":/backup alpine \
-  sh -c "apk add --no-cache sqlite && sqlite3 /data/booksDb.sqlite \"VACUUM INTO '/backup/booksDb-backup.sqlite'\""
+docker compose stop web
+docker compose cp web:/app/data/booksDb.sqlite ./booksDb-backup.sqlite
+docker compose start web
 ```
 
-Or stop the app and copy the file itself (`booksDb.sqlite` plus `-wal` / `-shm`) out of the
-volume with `docker compose cp`.
+If you have a `sqlite3` binary available, `VACUUM INTO` produces a consistent snapshot
+without stopping the app:
+
+```bash
+sqlite3 booksDb.sqlite "VACUUM INTO 'booksDb-backup.sqlite'"
+```
 
 ## CI/CD — GitHub Actions
 
@@ -795,16 +857,38 @@ volume with `docker compose cp`.
 
 ### One-time setup
 
-1. Create the Docker Hub repository `aspnet-core-mvc-sqlite` (or change `IMAGE_NAME` in the
-   workflow).
+1. Create the Docker Hub repository — this project publishes to
+   **`harrysuke/aspnet-core-mvc-sqlite`** (or change `IMAGE_NAME` in the workflow and
+   `DOCKERHUB_USERNAME` in `.env.example`).
 2. Add two repository secrets (Settings → Secrets and variables → Actions):
 
    | Secret | Value |
    | --- | --- |
-   | `DOCKERHUB_USERNAME` | Docker Hub account name |
+   | `DOCKERHUB_USERNAME` | `harrysuke` |
    | `DOCKERHUB_TOKEN` | Access token from Docker Hub → Account settings → Security |
 
    Use a token, not your password — tokens can be scoped and revoked.
+
+### Manual push (no CI)
+
+```bash
+docker login --username harrysuke          # paste an access token as the password
+
+cd ASP.NET-Core-MVC-SQLite
+docker build -t harrysuke/aspnet-core-mvc-sqlite:latest .
+docker tag harrysuke/aspnet-core-mvc-sqlite:latest harrysuke/aspnet-core-mvc-sqlite:1.0.0
+docker push harrysuke/aspnet-core-mvc-sqlite:latest
+docker push harrysuke/aspnet-core-mvc-sqlite:1.0.0
+```
+
+Docker Hub creates the repository on the first push. Or let compose do the naming, since
+`.env.example` already sets `DOCKERHUB_USERNAME=harrysuke`:
+
+```bash
+cp .env.example .env
+docker compose build          # tags harrysuke/aspnet-core-mvc-sqlite:latest
+docker compose push
+```
 
 ### Pipeline
 
@@ -843,6 +927,35 @@ and roughly triple the runtime. To enable it:
 
 The publish step is RID-agnostic, so the same image content works on both architectures
 (the `runtimes/` folder carries `libe_sqlite3.so` per RID).
+
+## Build troubleshooting
+
+### `E: Unable to locate package curl` / `Could not connect to archive.ubuntu.com:80`
+
+```
+#12 30.67 Err:1 http://archive.ubuntu.com/ubuntu noble InRelease
+#12 30.67   Could not connect to archive.ubuntu.com:80 ... Connection refused
+#12 30.90 E: Unable to locate package curl
+```
+
+**Cause:** the build container can reach the container registry and `api.nuget.org` over
+HTTPS, but not the distribution package mirrors over HTTP. `apt-get` therefore has no
+package index and cannot install anything. (`dotnet restore` still works — that is why the
+`build` stage completes.)
+
+**Fix applied:** the image no longer runs `apt-get` at all. The only binary the runtime
+stage needed was an HTTP client for the healthcheck, so a static `busybox` is copied from
+the official image:
+
+```dockerfile
+COPY --from=busybox:stable /bin/busybox /bin/busybox
+HEALTHCHECK CMD ["/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
+```
+
+If you do need OS packages on such a network, either point apt at HTTPS mirrors
+(`sed -i 's|http://|https://|' /etc/apt/sources.list.d/ubuntu.sources`) or copy the static
+binaries you need from another image — both keep the build reproducible on networks that
+block port 80.
 
 ## Known caveats
 

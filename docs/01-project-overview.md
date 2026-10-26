@@ -12,8 +12,11 @@ audit logging, analytics, and role-based authorization.
 - **Identity & Accounts** — register, login, logout, password reset, account profile
   (`AccountController`). Extended to allow resetting arbitrary users' passwords via
   `User/ResetPassword`.
-- **User management (Admin)** — `UserController` lists users with roles, create / edit /
-  delete, and reset passwords.
+- **User management (Admin)** — `UserController` (AdminOnly) lists users with their
+  access level, searchable/filterable, create with a chosen role, edit, reset passwords,
+  grant/revoke `Admin`/`Member`, lock/unlock, delete. Guard rails block self-demotion,
+  self-deletion, self-lock and removing the last admin; non-admins get
+  `/Account/AccessDenied`.
 - **Role-based authorization** —
   - Fallback policy: authenticated required on everything.
   - `MemberOnly` = `Admin` or `Member`.

@@ -10,8 +10,12 @@ manager, a REST API, and a dark/light theme toggle.
 - **Book CRUD** against a local `booksDb.sqlite` file through EF Core. SQLite has no
   stored procedures, so the data access that used to live in T-SQL procs now lives in
   `BookRepository`.
-- **Identity & roles** — register/login/logout, password reset, profile, user
-  management; `Admin` and `Member` roles with `MemberOnly` / `AdminOnly` policies.
+- **Identity & roles** — register/login/logout, password reset, profile; `Admin` and
+  `Member` roles with `MemberOnly` / `AdminOnly` policies.
+- **Admin-only user management** (`/User`) — search and filter accounts by access level,
+  create users with a chosen role, edit, reset passwords, grant/revoke roles, lock/unlock
+  and delete. Guard rails stop an admin from deleting, demoting or locking themselves or
+  the last remaining admin; non-admins land on a friendly `/Account/AccessDenied` page.
 - **Audit trail** — global `AuditActionFilter` + `PageViewFilter` record writes and page
   views with retention cleanup, exposed via a paged admin log + CSV export.
 - **Analytics / KPI dashboard** — daily traffic and login charts (Chart.js, theme-aware)
@@ -53,7 +57,7 @@ Pull the published image:
 
 ```bash
 docker run -d -p 8080:8080 -v books-data:/app/data \
-  <dockerhub-user>/aspnet-core-mvc-sqlite:latest
+  harrysuke/aspnet-core-mvc-sqlite:latest
 ```
 
 See [docs/09 — Docker & CI/CD](docs/09-docker-cicd.md) for the image layout, configuration

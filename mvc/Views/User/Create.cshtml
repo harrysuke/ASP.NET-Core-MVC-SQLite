@@ -28,6 +28,15 @@
                         <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
                         <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
                     </div>
+                    <div class="mb-3">
+                        <label asp-for="Role" class="form-label"></label>
+                        <select asp-for="Role" class="form-select">
+                            <option value="Member">Member &mdash; books, dashboard, REST API</option>
+                            <option value="Admin">Admin &mdash; full access, including user management</option>
+                        </select>
+                        <div class="form-text">You can change this later from the user list.</div>
+                        <span asp-validation-for="Role" class="text-danger"></span>
+                    </div>
                     <button type="submit" class="btn btn-primary">Create</button>
                     <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
                 </form>

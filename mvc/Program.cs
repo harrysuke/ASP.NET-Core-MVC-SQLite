@@ -64,6 +64,7 @@ builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login"; // Set the login path for authentication
     options.LogoutPath = "/Account/Logout"; // Set the logout path
+    options.AccessDeniedPath = "/Account/AccessDenied"; // Signed in, but not allowed (e.g. Member -> /User)
 });
 
 builder.Services.AddDistributedMemoryCache();

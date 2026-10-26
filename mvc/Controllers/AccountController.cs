@@ -271,6 +271,16 @@ namespace mvc.Controllers
         {
             return View();
         }
+
+        // Reached when an authenticated user hits a policy they do not satisfy
+        // (configured as CookieAuthenticationOptions.AccessDeniedPath).
+        [HttpGet]
+        [AllowAnonymous]
+        public IActionResult AccessDenied(string? returnUrl)
+        {
+            ViewData["ReturnUrl"] = returnUrl;
+            return View();
+        }
         private void AddIdentityErrors(IdentityResult result)
         {
             foreach (var error in result.Errors)

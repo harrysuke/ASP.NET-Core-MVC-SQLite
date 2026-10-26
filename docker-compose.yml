@@ -45,12 +45,14 @@ services:
       # EmailSettings__FromName: ${SMTP_FROM_NAME:-}
     volumes:
       - books-data:/app/data
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8080/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 25s
+    # The healthcheck is defined in the Dockerfile (static busybox wget, no curl
+    # needed). Override it here only if you want different timings, e.g.:
+    # healthcheck:
+    #   test: ["CMD", "/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
+    #   interval: 30s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 25s
     security_opt:
       - no-new-privileges:true
 

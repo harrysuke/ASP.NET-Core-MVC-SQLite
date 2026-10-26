@@ -6,8 +6,10 @@
 - Password policy: RequireDigit, RequiredLength ≥ 6, RequireNonAlphanumeric = **false**,
   RequireUppercase (set inline in `Program.cs`).
 - Cookies via `ConfigureApplicationCookie`:
-  - `LoginPath` = `/Account/Login`
+  - `LoginPath` = `/Account/Login` — anonymous user hits a protected page.
   - `LogoutPath` = `/Account/Logout`
+  - `AccessDeniedPath` = `/Account/AccessDenied` — signed in, but the wrong role
+    (e.g. a `Member` opening `/User`).
 - Session cookie: 30-min idle timeout, `HttpOnly`, `IsEssential`.
 - Identity email services are wired to `EmailSender` (`IEmailSender<IdentityUser>`)
   via SMTP settings in `EmailSettings` (enables confirmation/reset emails).
@@ -18,6 +20,54 @@ Created in `SeedData` at startup and referenced by the authorization policies:
 
 - `Admin` — full control (user management, audit log, analytics/secret areas).
 - `Member` — normal logged-in members.
+
+## Access levels
+
+Every account is described by the roles it holds. The UI calls this the account's
+**access level**, and there are exactly three effective states:
+
+| Access level | Roles held | Can do |
+| --- | --- | --- |
+| Admin | `Admin` (+ `Member`) | Everything, including **user management** |
+| Member | `Member` | Books, dashboard, REST API, analytics, audit log |
+| No access | *(none)* | Signed in but blocked by every policy → `/Account/AccessDenied` |
+
+`/User` is the only screen that changes other people's access, and it is gated at the
+controller level (`[Authorize(Policy = "AdminOnly")]`) — the navbar/sidebar links are
+merely hidden for non-admins, they are not the security boundary.
+
+## User management (`/User`)
+
+Admin-only CRUD over Identity users, backed by `UserManager` / `RoleManager`:
+
+| Action | Route | Notes |
+| --- | --- | --- |
+| List + search | `GET /User?q=&role=` | Filter by email/username and by access level (`Admin`, `Member`, `None`) |
+| Create | `GET/POST /User/Create` | Choose the access level at creation time (`Member` is the default) |
+| Details | `GET /User/Details/{id}` | Roles, lockout state, confirmed email/phone, 2FA |
+| Edit | `GET/POST /User/Edit` | Email/username + phone; rejects duplicates |
+| Reset password | `GET/POST /User/ResetPassword` | Admin sets a new password directly (no email round-trip) |
+| Grant/revoke role | `POST /User/ToggleRole` | Only `Admin` / `Member` accepted; anything else → 400 |
+| Lock/unlock | `POST /User/ToggleLockout` | Sets `LockoutEnabled` + a 100-year `LockoutEnd` |
+| Delete | `GET/POST /User/Delete` | Confirmation page, then `DeleteAsync` |
+
+Guard rails, so an admin cannot lock themselves out of the system:
+
+- **No self-destruction** — you cannot delete your own account, remove the `Admin` role
+  from yourself, or lock yourself. Those menu items are also disabled in the UI.
+- **No last-admin removal** — `IsLastAdmin()` blocks deleting, demoting, or locking the
+  only remaining `Admin`.
+- **Audit trail** — every mutation writes an `AuditLogs` row via
+  `HttpContext.Items["AuditDetails"]`, e.g. *"Created user 'x@y' with role 'Admin'."*
+
+A `Member` (or a role-less account) that opens `/User` is bounced to
+`/Account/AccessDenied`, which shows the account's current roles and offers
+"Back to home" / "Sign in as a different user".
+
+`tests/user-management-smoke.py` exercises the whole flow against a running instance
+(admin login → create member → search/filter → member blocked → guard rails →
+lock/unlock → promote/demote → audit trail); it prints 47 pass/fail checks and exits
+non-zero on any failure. See the header of that file for how to point it at a stack.
 
 ## Authorization
 

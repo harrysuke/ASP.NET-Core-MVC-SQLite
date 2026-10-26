@@ -1,0 +1,69 @@
+@{
+    ViewData["Title"] = "Access denied";
+    string? returnUrl = ViewData["ReturnUrl"] as string;
+    bool isSignedIn = User?.Identity?.IsAuthenticated == true;
+    string? accountName = User?.Identity?.Name;
+    string roles = string.Join(", ", (User?.Claims ?? Array.Empty<System.Security.Claims.Claim>())
+        .Where(c => c.Type == System.Security.Claims.ClaimTypes.Role)
+        .Select(c => c.Value));
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4 text-center">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle text-danger mb-3"
+                     style="width:64px;height:64px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M8 1a2 2 0 0 1 2 2v4H6V3a2 2 0 0 1 2-2zm3 6V3a3 3 0 0 0-6 0v4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z" />
+                    </svg>
+                </div>
+
+                <h1 class="h3 mb-2">Access denied</h1>
+                <p class="text-body-secondary mb-3">
+                    Your account does not have permission to open this page.
+                    User management is restricted to accounts with the <strong>Admin</strong> access level.
+                </p>
+
+                @if (isSignedIn)
+                {
+                    <p class="small text-body-secondary mb-4">
+                        Signed in as <strong>@accountName</strong>
+                        @if (!string.IsNullOrWhiteSpace(roles))
+                        {
+                            <span class="text-body-tertiary">(@roles access)</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(returnUrl))
+                        {
+                            <br />
+                            <span class="text-body-tertiary">Requested page: <code>@returnUrl</code></span>
+                        }
+                    </p>
+                }
+                else
+                {
+                    <p class="small text-body-secondary mb-4">You need to sign in with an Admin account to continue.</p>
+                }
+
+                <div class="d-flex flex-wrap gap-2 justify-content-center">
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-outline-primary">Back to home</a>
+                    @if (isSignedIn)
+                    {
+                        <a asp-controller="Account" asp-action="Profile" class="btn btn-outline-secondary">My profile</a>
+                        <form asp-controller="Account" asp-action="Logout" method="post" id="accessDeniedLogoutForm" class="d-inline">
+                            <button type="submit" class="btn btn-success">Sign in as a different user</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <a asp-controller="Account" asp-action="Login" asp-route-returnUrl="@returnUrl" class="btn btn-success">Sign in</a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <p class="text-center small text-body-secondary mt-3 mb-0">
+            Think this is a mistake? Ask an administrator to review your access level.
+        </p>
+    </div>
+</div>

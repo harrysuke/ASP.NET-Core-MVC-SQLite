@@ -2,10 +2,20 @@
 
 @{
     ViewData["Title"] = "User Management";
+    string? searchTerm = ViewData["SearchTerm"] as string;
+    string? roleFilter = ViewData["RoleFilter"] as string;
+    int totalUsers = ViewData["TotalUsers"] as int? ?? 0;
+    int totalAdmins = ViewData["TotalAdmins"] as int? ?? 0;
+    int totalMembers = ViewData["TotalMembers"] as int? ?? 0;
+    int totalNoAccess = ViewData["TotalNoAccess"] as int? ?? 0;
+    bool filtered = !string.IsNullOrEmpty(searchTerm) || !string.IsNullOrEmpty(roleFilter);
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h1 class="h3 mb-0">User management</h1>
+    <div>
+        <h1 class="h3 mb-0">User management</h1>
+        <p class="text-body-secondary mb-0 small">Admin only &mdash; create accounts, change access levels, lock or remove users.</p>
+    </div>
     <a asp-action="Create" class="btn btn-primary">Create new user</a>
 </div>
 
@@ -18,23 +28,141 @@
     <div class="alert alert-danger" role="alert">@TempData["UserError"]</div>
 }
 
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-body-secondary small text-uppercase">Users</div>
+                <div class="h4 mb-0">@totalUsers</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-body-secondary small text-uppercase">Admins</div>
+                <div class="h4 mb-0">@totalAdmins</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-body-secondary small text-uppercase">Members</div>
+                <div class="h4 mb-0">@totalMembers</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body py-3">
+                <div class="text-body-secondary small text-uppercase">No access</div>
+                <div class="h4 mb-0 @(totalNoAccess > 0 ? "text-warning-emphasis" : "")">@totalNoAccess</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h6 text-uppercase text-body-secondary mb-2">What each access level can do</h2>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col" style="width: 18rem;">Capability</th>
+                        <th scope="col" class="text-center">Admin</th>
+                        <th scope="col" class="text-center">Member</th>
+                        <th scope="col" class="text-center">No access</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Browse / search books, dashboard, REST API</td>
+                        <td class="text-center text-success">&#10003;</td>
+                        <td class="text-center text-success">&#10003;</td>
+                        <td class="text-center text-body-secondary">&mdash;</td>
+                    </tr>
+                    <tr>
+                        <td>Create / edit / delete books, export reports</td>
+                        <td class="text-center text-success">&#10003;</td>
+                        <td class="text-center text-success">&#10003;</td>
+                        <td class="text-center text-body-secondary">&mdash;</td>
+                    </tr>
+                    <tr>
+                        <td>Analytics, audit log</td>
+                        <td class="text-center text-success">&#10003;</td>
+                        <td class="text-center text-body-secondary">&mdash;</td>
+                        <td class="text-center text-body-secondary">&mdash;</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Manage users &amp; access levels</strong></td>
+                        <td class="text-center text-success">&#10003;</td>
+                        <td class="text-center text-body-secondary">&mdash;</td>
+                        <td class="text-center text-body-secondary">&mdash;</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<form method="get" asp-action="Index" class="row g-2 align-items-end mb-3">
+    <div class="col-sm-6 col-lg-4">
+        <label for="q" class="form-label small mb-1">Search by email or username</label>
+        <input id="q" name="q" value="@searchTerm" class="form-control" placeholder="e.g. admin@@example.com" />
+    </div>
+    <div class="col-sm-4 col-lg-3">
+        <label for="role" class="form-label small mb-1">Access level</label>
+        <select id="role" name="role" class="form-select">
+            <option value="" selected="@(string.IsNullOrEmpty(roleFilter) ? "selected" : null)">Any</option>
+            <option value="Admin" selected="@(roleFilter == "Admin" ? "selected" : null)">Admin</option>
+            <option value="Member" selected="@(roleFilter == "Member" ? "selected" : null)">Member</option>
+            <option value="None" selected="@(roleFilter == "None" ? "selected" : null)">No access</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Filter</button>
+        @if (filtered)
+        {
+            <a asp-action="Index" class="btn btn-link">Clear</a>
+        }
+    </div>
+</form>
+
 <div class="card">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
             <thead>
                 <tr>
                     <th scope="col">Email</th>
-                    <th scope="col">Roles</th>
+                    <th scope="col">Access level</th>
                     <th scope="col">Email confirmed</th>
                     <th scope="col">Status</th>
                     <th scope="col" class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var user in Model)
+                @if (Model.Count == 0)
                 {
                     <tr>
-                        <td>@user.Email</td>
+                        <td colspan="5" class="text-center text-body-secondary py-4">
+                            No users match this filter.
+                        </td>
+                    </tr>
+                }
+                @foreach (var user in Model)
+                {
+                    string currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+                    bool isSelf = user.Id == currentUserId;
+                    <tr>
+                        <td>
+                            @user.Email
+                            @if (isSelf)
+                            {
+                                <span class="badge text-bg-secondary ms-1">you</span>
+                            }
+                        </td>
                         <td>
                             @if (user.IsAdmin)
                             {
@@ -46,7 +174,7 @@
                             }
                             @if (!user.IsAdmin && !user.IsMember)
                             {
-                                <span class="text-body-secondary">None</span>
+                                <span class="badge text-bg-warning">No access</span>
                             }
                         </td>
                         <td>
@@ -70,29 +198,48 @@
                             }
                         </td>
                         <td class="text-end">
-                            <div class="d-flex justify-content-end gap-2 flex-wrap">
-                                <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@user.Id">Details</a>
-                                <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@user.Id">Edit</a>
-                                <a class="btn btn-sm btn-outline-secondary" asp-action="ResetPassword" asp-route-id="@user.Id">Reset password</a>
-                                <form asp-action="ToggleRole" asp-route-id="@user.Id" asp-route-role="Admin" method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm @(user.IsAdmin ? "btn-outline-warning" : "btn-outline-primary")">
-                                        @(user.IsAdmin ? "Remove Admin" : "Make Admin")
-                                    </button>
-                                </form>
-                                <form asp-action="ToggleRole" asp-route-id="@user.Id" asp-route-role="Member" method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm btn-outline-primary">
-                                        @(user.IsMember ? "Remove Member" : "Make Member")
-                                    </button>
-                                </form>
-                                <form asp-action="ToggleLockout" asp-route-id="@user.Id" method="post" class="d-inline">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm @(user.IsLockedOut ? "btn-outline-success" : "btn-outline-warning")">
-                                        @(user.IsLockedOut ? "Unlock" : "Lock")
-                                    </button>
-                                </form>
-                                <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@user.Id">Delete</a>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown" data-bs-strategy="fixed" aria-expanded="false">
+                                    Manage
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" asp-action="Details" asp-route-id="@user.Id">Details</a></li>
+                                    <li><a class="dropdown-item" asp-action="Edit" asp-route-id="@user.Id">Edit account</a></li>
+                                    <li><a class="dropdown-item" asp-action="ResetPassword" asp-route-id="@user.Id">Reset password</a></li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li class="dropdown-header small">Access level</li>
+                                    <li>
+                                        <form asp-action="ToggleRole" asp-route-id="@user.Id" asp-route-role="Admin" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item" disabled="@(isSelf && user.IsAdmin ? "disabled" : null)">
+                                                @(user.IsAdmin ? "Remove Admin" : "Grant Admin")
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li>
+                                        <form asp-action="ToggleRole" asp-route-id="@user.Id" asp-route-role="Member" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item">
+                                                @(user.IsMember ? "Remove Member" : "Grant Member")
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li><hr class="dropdown-divider" /></li>
+                                    <li>
+                                        <form asp-action="ToggleLockout" asp-route-id="@user.Id" method="post">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="dropdown-item @(user.IsLockedOut ? "" : "text-warning-emphasis")" disabled="@(isSelf ? "disabled" : null)">
+                                                @(user.IsLockedOut ? "Unlock account" : "Lock account")
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item text-danger @(isSelf ? "disabled" : "")"
+                                           asp-action="Delete" asp-route-id="@user.Id"
+                                           aria-disabled="@(isSelf ? "true" : "false")">Delete user</a>
+                                    </li>
+                                </ul>
                             </div>
                         </td>
                     </tr>

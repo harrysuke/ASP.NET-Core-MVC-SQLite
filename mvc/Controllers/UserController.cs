@@ -19,17 +19,17 @@ namespace mvc.Controllers
             _roleManager = roleManager;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? q, string? role)
         {
             List<IdentityUser> users = await _userManager.Users
                 .OrderBy(u => u.Email)
                 .ToListAsync();
 
-            List<UserListViewModel> model = new List<UserListViewModel>();
+            List<UserListViewModel> all = new List<UserListViewModel>();
             foreach (IdentityUser user in users)
             {
                 IList<string> roles = await _userManager.GetRolesAsync(user);
-                model.Add(new UserListViewModel
+                all.Add(new UserListViewModel
                 {
                     Id = user.Id,
                     UserName = user.UserName ?? string.Empty,
@@ -40,7 +40,38 @@ namespace mvc.Controllers
                     IsMember = roles.Contains(SeedData.MemberRole)
                 });
             }
-            return View(model);
+
+            // Totals describe the whole directory, not the filtered page.
+            ViewData["TotalUsers"] = all.Count;
+            ViewData["TotalAdmins"] = all.Count(u => u.IsAdmin);
+            ViewData["TotalMembers"] = all.Count(u => u.IsMember);
+            ViewData["TotalNoAccess"] = all.Count(u => !u.IsAdmin && !u.IsMember);
+
+            IEnumerable<UserListViewModel> filtered = all;
+
+            string? term = string.IsNullOrWhiteSpace(q) ? null : q.Trim();
+            if (term != null)
+            {
+                filtered = filtered.Where(u =>
+                    u.Email.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || u.UserName.Contains(term, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                filtered = role switch
+                {
+                    SeedData.AdminRole => filtered.Where(u => u.IsAdmin),
+                    SeedData.MemberRole => filtered.Where(u => u.IsMember),
+                    "None" => filtered.Where(u => !u.IsAdmin && !u.IsMember),
+                    _ => filtered
+                };
+            }
+
+            ViewData["SearchTerm"] = term;
+            ViewData["RoleFilter"] = role;
+
+            return View(filtered.ToList());
         }
 
         public async Task<IActionResult> Details(string id)
@@ -96,8 +127,18 @@ namespace mvc.Controllers
                 return View(model);
             }
 
-            HttpContext.Items["AuditDetails"] = $"Created user '{user.Email}'.";
-            TempData["UserSuccess"] = $"User '{user.Email}' created.";
+            // Grant the selected access level; anything unexpected falls back to Member.
+            string role = model.Role == SeedData.AdminRole ? SeedData.AdminRole : SeedData.MemberRole;
+            IdentityResult roleResult = await _userManager.AddToRoleAsync(user, role);
+            if (!roleResult.Succeeded)
+            {
+                AddIdentityErrors(roleResult);
+                TempData["UserError"] = $"User '{user.Email}' was created but the '{role}' role could not be assigned.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            HttpContext.Items["AuditDetails"] = $"Created user '{user.Email}' with role '{role}'.";
+            TempData["UserSuccess"] = $"User '{user.Email}' created with '{role}' access.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -295,6 +336,22 @@ namespace mvc.Controllers
             }
             else
             {
+                // Locking is the admin-only kill switch, so guard the two ways it could
+                // remove the last person able to unlock anyone.
+                string currentUserId = _userManager.GetUserId(User) ?? string.Empty;
+                if (user.Id == currentUserId)
+                {
+                    TempData["UserError"] = "You cannot lock your own account.";
+                    return RedirectToAction(nameof(Index));
+                }
+                if (await IsLastAdmin(user.Id))
+                {
+                    TempData["UserError"] = "You cannot lock the last remaining admin.";
+                    return RedirectToAction(nameof(Index));
+                }
+
+                // Lockout is only honoured when LockoutEnabled is on, so set both.
+                await _userManager.SetLockoutEnabledAsync(user, true);
                 await _userManager.SetLockoutEndDateAsync(user, DateTimeOffset.UtcNow.AddYears(100));
                 HttpContext.Items["AuditDetails"] = $"Locked user '{user.Email}'.";
                 TempData["UserSuccess"] = $"'{user.Email}' locked.";
