@@ -1,0 +1,169 @@
+name: Docker Hub
+
+# Builds the image on every push / PR, smoke-tests it, and publishes to Docker Hub
+# on pushes to the default branch and on v*.*.* tags. Pull requests build only.
+#
+# Required repository secrets:
+#   DOCKERHUB_USERNAME  Docker Hub account that owns the repository
+#   DOCKERHUB_TOKEN     Docker Hub access token (Account settings -> Security -> New access token)
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*.*.*"]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - ".gitignore"
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: aspnet-core-mvc-sqlite
+  DOTNET_VERSION: "10.0.x"
+  # `||` keeps PR builds from fork PRs working, where secrets are not exposed.
+  IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_USERNAME || 'local' }}
+
+jobs:
+  verify:
+    name: Build & verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore mvc/mvc.csproj
+
+      - name: Build (Release)
+        run: dotnet build mvc/mvc.csproj --configuration Release --no-restore
+
+      - name: Publish (same command the Dockerfile runs)
+        run: >
+          dotnet publish mvc/mvc.csproj
+          --configuration Release
+          --no-restore
+          --output "$RUNNER_TEMP/publish"
+          /p:UseAppHost=false
+
+      - name: Check publish output
+        run: |
+          test -f "$RUNNER_TEMP/publish/mvc.dll"
+          test -f "$RUNNER_TEMP/publish/appsettings.json"
+          ls -la "$RUNNER_TEMP/publish" | head -20
+
+  docker:
+    name: Build, smoke test & push
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker metadata (tags & labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAMESPACE }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=short,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Build once into the local image store so the container can be probed
+      # before anything is published. The next build reuses the same GHA cache.
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: mvc-smoke:test
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the container
+        run: |
+          set -o pipefail
+          docker run --detach --name mvc-smoke --publish 8080:8080 mvc-smoke:test
+
+          healthy=0
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --output /dev/null http://localhost:8080/; then
+              healthy=1
+              echo "Container answered after ${attempt} attempt(s)."
+              break
+            fi
+            sleep 2
+          done
+
+          echo "--- container logs ---"
+          docker logs mvc-smoke || true
+          echo "--- healthcheck status ---"
+          docker inspect --format '{{json .State.Health.Status}}' mvc-smoke || true
+
+          if [ "$healthy" -ne 1 ]; then
+            echo "::error::Container did not answer on http://localhost:8080/ within 60s."
+            docker rm --force mvc-smoke
+            exit 1
+          fi
+
+          # The database must have been created on the volume, not in the image.
+          docker exec mvc-smoke test -f /app/data/booksDb.sqlite
+          docker rm --force mvc-smoke
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Add linux/arm64 here (with docker/setup-qemu-action) for multi-arch;
+          # it roughly triples the build time because .NET builds run emulated.
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Docker image"
+            echo ""
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "Pull request build — image was **not** pushed."
+            else
+              echo "Pushed tags:"
+              echo '```'
+              echo "${{ steps.meta.outputs.tags }}"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

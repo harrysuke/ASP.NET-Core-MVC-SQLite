@@ -1,0 +1,44 @@
+@model mvc.Models.UserDetailsViewModel
+
+@{
+    ViewData["Title"] = "User details";
+}
+
+<h1 class="h3 mb-3">User details</h1>
+
+<div class="card">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-4 text-body-secondary">Email</dt>
+            <dd class="col-sm-8">@Model.Email</dd>
+            <dt class="col-sm-4 text-body-secondary">Username</dt>
+            <dd class="col-sm-8">@Model.UserName</dd>
+            <dt class="col-sm-4 text-body-secondary">Phone</dt>
+            <dd class="col-sm-8">@(string.IsNullOrEmpty(Model.PhoneNumber) ? "&mdash;" : Model.PhoneNumber)</dd>
+            <dt class="col-sm-4 text-body-secondary">Email confirmed</dt>
+            <dd class="col-sm-8">@(Model.EmailConfirmed ? "Yes" : "No")</dd>
+            <dt class="col-sm-4 text-body-secondary">Phone confirmed</dt>
+            <dd class="col-sm-8">@(Model.PhoneNumberConfirmed ? "Yes" : "No")</dd>
+            <dt class="col-sm-4 text-body-secondary">Two-factor enabled</dt>
+            <dd class="col-sm-8">@(Model.TwoFactorEnabled ? "Yes" : "No")</dd>
+            <dt class="col-sm-4 text-body-secondary">Lockout enabled</dt>
+            <dd class="col-sm-8">@(Model.LockoutEnabled ? "Yes" : "No")</dd>
+            <dt class="col-sm-4 text-body-secondary">Lockout ends</dt>
+            <dd class="col-sm-8">@Model.LockoutEnd.ToString()</dd>
+            <dt class="col-sm-4 text-body-secondary">Roles</dt>
+            <dd class="col-sm-8">
+                @foreach (var role in Model.Roles)
+                {
+                    <span class="badge text-bg-danger">@role</span>
+                }
+                @if (!Model.Roles.Any())
+                {
+                    <span class="text-body-secondary">None</span>
+                }
+            </dd>
+        </dl>
+    </div>
+    <div class="card-footer bg-transparent">
+        <a asp-action="Index" class="btn btn-outline-secondary">Back to list</a>
+    </div>
+</div>

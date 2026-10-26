@@ -1,0 +1,58 @@
+# Local / single-host deployment.
+#
+#   cp .env.example .env    # then edit the admin credentials
+#   docker compose up --build -d
+#   docker compose logs -f web
+#
+# The SQLite database is kept in the `books-data` named volume, so
+# `docker compose down` (without -v) never loses the catalog or users.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USERNAME:-local}/aspnet-core-mvc-sqlite:${TAG:-latest}
+    container_name: mvc-books
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+
+      # Keep the database on the volume, not in the container's writable layer.
+      ConnectionStrings__DefaultConnection: "Data Source=/app/data/booksDb.sqlite;Default Timeout=30"
+
+      # Trust X-Forwarded-* when the container sits behind nginx / Traefik / IIS ARR.
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+
+      # Bootstrap admin, created once by SeedData on first start.
+      Admin__Email: ${ADMIN_EMAIL:-}
+      Admin__Password: ${ADMIN_PASSWORD:-}
+
+      # Audit log retention in days (0 disables the purge).
+      Audit__RetentionDays: ${AUDIT_RETENTION_DAYS:-180}
+
+      # SMTP for Identity emails. Leave unset to disable password-reset mail;
+      # setting only some of them (e.g. Host without Port) makes the options
+      # binder fail, so keep the whole block or none of it.
+      # EmailSettings__Host: ${SMTP_HOST:-}
+      # EmailSettings__Port: ${SMTP_PORT:-587}
+      # EmailSettings__UseSsl: ${SMTP_USE_SSL:-true}
+      # EmailSettings__Username: ${SMTP_USERNAME:-}
+      # EmailSettings__Password: ${SMTP_PASSWORD:-}
+      # EmailSettings__FromEmail: ${SMTP_FROM_EMAIL:-}
+      # EmailSettings__FromName: ${SMTP_FROM_NAME:-}
+    volumes:
+      - books-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  books-data:

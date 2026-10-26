@@ -1,0 +1,172 @@
+﻿@model mvc.Models.HomeIndexViewModel
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<IdentityUser> SignInManager
+@{
+    ViewData["Title"] = "Home";
+    bool signedIn = SignInManager.IsSignedIn(User);
+    bool isAdmin = User?.IsInRole("Admin") == true;
+}
+
+<div class="hero-cover mb-4">
+    <div class="container py-4">
+        <h1 class="display-4 fw-bold">Book Catalogue</h1>
+        <p class="fs-5 mb-4">
+            Manage and discover your book collection in one place &mdash; browse titles,
+            search by name, and keep the catalogue up to date.
+        </p>
+        @if (signedIn)
+        {
+            <form asp-controller="Book" asp-action="Search" method="post" class="row g-2 mb-3">
+                @Html.AntiForgeryToken()
+                <div class="col-auto flex-grow-1">
+                    <input type="text" name="searchString" class="form-control form-control-lg"
+                           placeholder="Search books by title&hellip;" aria-label="Search books" autocomplete="off" spellcheck="false" />
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-light btn-lg">Search</button>
+                </div>
+            </form>
+            <a asp-controller="Book" asp-action="Index" class="btn btn-light btn-lg">Browse books</a>
+            <a asp-controller="Book" asp-action="Create" class="btn btn-outline-light btn-lg">Add a book</a>
+        }
+        else
+        {
+            <a asp-controller="Account" asp-action="Register" class="btn btn-light btn-lg">Get started</a>
+            <a asp-controller="Account" asp-action="Login" class="btn btn-outline-light btn-lg">Sign in</a>
+        }
+    </div>
+</div>
+
+@if (signedIn)
+{
+    <div class="row g-3 mb-4 text-center">
+        <div class="col-6 col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-primary tabular-nums">@Model.TotalBooks</div>
+                    <div class="text-body-secondary">Books</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-primary tabular-nums">@($"{Model.TotalValue:N0}")</div>
+                    <div class="text-body-secondary">Total value</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-primary tabular-nums">@($"{Model.AvgPrice:0.##}")</div>
+                    <div class="text-body-secondary">Avg. price</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="fs-3 fw-bold text-primary tabular-nums">@Model.FeaturedBooks.Count</div>
+                    <div class="text-body-secondary">Featured</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mb-3">Featured books</h2>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3 mb-4">
+        @foreach (var book in Model.FeaturedBooks)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@book.Title</h5>
+                        <h6 class="card-subtitle mb-2 text-body-secondary">@book.Author</h6>
+                        <p class="card-text fs-5">@($"{book.Price:N0}")</p>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <a asp-controller="Book" asp-action="Details" asp-route-id="@book.Id" class="btn btn-sm btn-outline-primary">View details</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="row g-3 mb-2">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Browse catalogue</h5>
+                    <p class="card-text text-body-secondary">View, edit and remove books, or generate PDF and Excel reports.</p>
+                    <a asp-controller="Book" asp-action="Index" class="btn btn-primary">Go to books</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">REST API</h5>
+                    <p class="card-text text-body-secondary">Interact with book data programmatically over HTTP.</p>
+                    <a asp-controller="Home" asp-action="Api" class="btn btn-outline-primary">View API</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isAdmin)
+    {
+        <div class="row g-3 mb-2">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Audit log</h5>
+                        <p class="card-text text-body-secondary">Review security events and mutations across the app.</p>
+                        <a asp-controller="AuditLog" asp-action="Index" class="btn btn-outline-primary">Open audit</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Analytics &amp; KPIs</h5>
+                        <p class="card-text text-body-secondary">Traffic, logins, book and security KPIs at a glance.</p>
+                        <a asp-controller="Analytics" asp-action="Index" class="btn btn-outline-primary">Open analytics</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-3 g-3">
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Secure access</h5>
+                    <p class="card-text text-body-secondary">Create an account or sign in to manage the catalogue.</p>
+                    <a asp-controller="Account" asp-action="Login" class="btn btn-primary">Sign in</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">REST API</h5>
+                    <p class="card-text text-body-secondary">Interact with book data programmatically over HTTP.</p>
+                    <a asp-controller="Home" asp-action="Api" class="btn btn-outline-primary">View API</a>
+                </div>
+            </div>
+        </div>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Member catalogue</h5>
+                    <p class="card-text text-body-secondary">Browse, search, add and edit books once signed in.</p>
+                    <a asp-controller="Account" asp-action="Register" class="btn btn-outline-primary">Create account</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}

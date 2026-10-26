@@ -1,0 +1,362 @@
+@model mvc.Models.AnalyticsDashboardData
+
+@{
+    ViewData["Title"] = "Analytics";
+    int currentDays = Model.Days;
+}
+
+<h1 class="h3 mb-3">Analytics &amp; KPIs</h1>
+
+@{
+    int[] presets = new[] { 7, 14, 30, 0 };
+    string Label(int d) => d == 0 ? "All time" : $"Last {d} days";
+}
+
+<ul class="nav nav-pills mb-3">
+    @foreach (int d in presets)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(currentDays == d ? "active" : "")" asp-action="Index" asp-route-days="@d">@Label(d)</a>
+        </li>
+    }
+</ul>
+
+@{
+    var tot = Model.Totals;
+}
+
+<div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-3 mb-4">
+    <div class="col">
+        <div class="card text-bg-primary h-100">
+            <div class="card-body">
+                <div class="card-title">Total users</div>
+                <div class="display-6">@tot.TotalUsers</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card text-bg-success h-100">
+            <div class="card-body">
+                <div class="card-title">Successful logins</div>
+                <div class="display-6">@tot.SuccessfulLogins</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card text-bg-danger h-100">
+            <div class="card-body">
+                <div class="card-title">Failed logins</div>
+                <div class="display-6">@tot.FailedLogins</div>
+                <div class="small">@tot.LoginSuccessRate % success</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card text-bg-secondary h-100">
+            <div class="card-body">
+                <div class="card-title">Page views</div>
+                <div class="display-6">@tot.TotalPageViews</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card text-bg-info h-100">
+            <div class="card-body">
+                <div class="card-title">Audit events</div>
+                <div class="display-6">@tot.TotalAuditEvents</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card text-bg-dark h-100">
+            <div class="card-body">
+                <div class="card-title">Books</div>
+                <div class="display-6">@tot.TotalBooks</div>
+                <div class="small">@($"{tot.TotalValue:N0}") total value</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@{
+    var chartTrends = Model.Trends.ToList();
+}
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Traffic &amp; actions (per day)</div>
+            <div class="card-body">
+                <canvas id="trafficChart" role="img" aria-label="Traffic and actions per day. Line chart of page views, logins and registrations over time." height="220"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">Logins (per day)</div>
+            <div class="card-body">
+                <canvas id="loginChart" role="img" aria-label="Logins per day. Bar chart of successful and failed logins over time." height="220"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-header">Top pages</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.TopPages)
+                {
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>@item.Label</span>
+                        <span class="badge text-bg-primary rounded-pill">@item.Count</span>
+                    </li>
+                }
+                @if (!Model.TopPages.Any())
+                {
+                    <li class="list-group-item text-body-secondary text-center">No page views yet.</li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-6 col-lg-4">
+        <div class="card">
+            <div class="card-header">Most active users</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.ActiveUsers)
+                {
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>@item.Label</span>
+                        <span class="badge text-bg-primary rounded-pill">@item.Count</span>
+                    </li>
+                }
+                @if (!Model.ActiveUsers.Any())
+                {
+                    <li class="list-group-item text-body-secondary text-center">No activity yet.</li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-6 col-lg-4">
+        <div class="card">
+            <div class="card-header">Books by author</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.BookAuthors)
+                {
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>@item.Author <span class="text-body-secondary small">avg @($"{item.AvgPrice:0.##}")</span></span>
+                        <span class="badge text-bg-primary rounded-pill">@item.BookCount</span>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-2">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Failed logins by IP</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.FailedLoginIps)
+                {
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>@item.Label</span>
+                        <span class="badge text-bg-danger rounded-pill">@item.Count</span>
+                    </li>
+                }
+                @if (!Model.FailedLoginIps.Any())
+                {
+                    <li class="list-group-item text-body-secondary text-center">No failed logins.</li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">Failed logins by email</div>
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.FailedLoginEmails)
+                {
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>@item.Label</span>
+                        <span class="badge text-bg-danger rounded-pill">@item.Count</span>
+                    </li>
+                }
+                @if (!Model.FailedLoginEmails.Any())
+                {
+                    <li class="list-group-item text-body-secondary text-center">No failed logins.</li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-4 mb-2">
+    <div class="card-header">Recent activity</div>
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Time (UTC)</th>
+                    <th>User</th>
+                    <th>Controller / Action</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Model.RecentActivity)
+                {
+                    <tr>
+                        <td>@entry.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@entry.UserName</td>
+                        <td>@entry.Controller / @entry.Action</td>
+                        <td>@entry.HttpMethod</td>
+                        <td>
+                            @if (entry.Success)
+                            {
+                                <span class="badge text-bg-success">OK</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-danger">Fail</span>
+                            }
+                        </td>
+                        <td>@entry.Details</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chart.js/dist/chart.umd.min.js" asp-append-version="true"></script>
+    @if (chartTrends.Any())
+    {
+        <script type="application/json" id="trends-data">@Html.Raw(System.Text.Json.JsonSerializer.Serialize(chartTrends))</script>
+    }
+    <script>
+        (function () {
+            'use strict';
+            if (typeof Chart === 'undefined') {
+                return;
+            }
+
+            var root = document.documentElement;
+            var dataEl = document.getElementById('trends-data');
+            var trafficChart = null;
+            var loginChart = null;
+            var labels = [];
+            var traffic = [];
+            var logins = [];
+            var regs = [];
+            var failed = [];
+
+            function cssVar(name) {
+                return getComputedStyle(root).getPropertyValue(name).trim();
+            }
+
+            function hexToRgba(color, alpha) {
+                if (typeof color !== 'string' || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(color)) {
+                    return color;
+                }
+                var hex = color.replace('#', '');
+                if (hex.length === 3) {
+                    hex = hex.split('').map(function (c) { return c + c; }).join('');
+                }
+                var n = parseInt(hex, 16);
+                return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + alpha + ')';
+            }
+
+            function themeColors() {
+                var text = cssVar('--bs-body-color') || '#212529';
+                return {
+                    text: text,
+                    grid: hexToRgba(text, 0.1),
+                    primary: cssVar('--bs-primary') || '#0d6efd',
+                    success: cssVar('--bs-success') || '#198754',
+                    danger: cssVar('--bs-danger') || '#dc3545',
+                    purple: cssVar('--bs-purple') || '#6f42c1'
+                };
+            }
+
+            function formatLabel(value) {
+                var d = new Date(value);
+                return isNaN(d) ? String(value) : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+            }
+
+            function renderCharts() {
+                var c = themeColors();
+                Chart.defaults.color = c.text;
+                Chart.defaults.borderColor = c.grid;
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily || 'system-ui';
+
+                var trafficEl = document.getElementById('trafficChart');
+                if (trafficEl) {
+                    if (trafficChart) { trafficChart.destroy(); }
+                    trafficChart = new Chart(trafficEl, {
+                        type: 'line',
+                        data: {
+                            labels: labels.map(formatLabel),
+                            datasets: [
+                                { label: 'Page views', data: traffic, borderColor: c.primary, backgroundColor: hexToRgba(c.primary, 0.1), fill: true, tension: 0.2 },
+                                { label: 'Logins', data: logins, borderColor: c.success, fill: true, tension: 0.2 },
+                                { label: 'Registrations', data: regs, borderColor: c.purple, fill: false, tension: 0.2 }
+                            ]
+                        },
+                        options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+                    });
+                }
+
+                var loginEl = document.getElementById('loginChart');
+                if (loginEl) {
+                    if (loginChart) { loginChart.destroy(); }
+                    loginChart = new Chart(loginEl, {
+                        type: 'bar',
+                        data: {
+                            labels: labels.map(formatLabel),
+                            datasets: [
+                                { label: 'Successful', data: logins, backgroundColor: c.success },
+                                { label: 'Failed', data: failed, backgroundColor: c.danger }
+                            ]
+                        },
+                        options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { position: 'bottom' } } }
+                    });
+                }
+            }
+
+            if (dataEl) {
+                try {
+                    var trends = JSON.parse(dataEl.textContent);
+                    labels = trends.map(function (t) { return t.date !== undefined ? t.date : t.Date; });
+                    traffic = trends.map(function (t) { return t.pageViews !== undefined ? t.pageViews : t.PageViews; });
+                    logins = trends.map(function (t) { return t.logins !== undefined ? t.logins : t.Logins; });
+                    regs = trends.map(function (t) { return t.registrations !== undefined ? t.registrations : t.Registrations; });
+                    failed = trends.map(function (t) { return t.failedLogins !== undefined ? t.failedLogins : t.FailedLogins; });
+                } catch (e) {
+                    dataEl = null;
+                }
+            }
+
+            if (!dataEl || labels.length === 0) {
+                var empty = document.createElement('p');
+                empty.className = 'text-body-secondary text-center mb-0';
+                empty.textContent = 'No trend data for the selected period.';
+                var cards = document.querySelectorAll('#trafficChart, #loginChart');
+                for (var i = 0; i < cards.length; i++) {
+                    cards[i].replaceWith(empty.cloneNode(true));
+                }
+            } else {
+                renderCharts();
+
+                root.addEventListener('themechange', function () {
+                    renderCharts();
+                });
+            }
+        })();
+    </script>
+}

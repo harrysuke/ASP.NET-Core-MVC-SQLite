@@ -1,0 +1,50 @@
+﻿@{
+    ViewData["Title"] = "REST API";
+    var baseUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+}
+
+<h1 class="h3 mb-3">@ViewData["Title"]</h1>
+
+<p class="text-body-secondary mb-4">
+    The book catalogue is available over HTTP as a REST API. Use the endpoints below to
+    read and manage books programmatically.
+</p>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h6 mb-3">Endpoints</h2>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Method</th>
+                        <th scope="col">URL</th>
+                        <th scope="col">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="badge text-bg-success">GET</span></td>
+                        <td><code>@(baseUrl)/api/rest</code></td>
+                        <td>Get all books</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge text-bg-primary">POST</span></td>
+                        <td><code>@(baseUrl)/api/rest</code></td>
+                        <td>Add a new book</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge text-bg-warning">PUT</span></td>
+                        <td><code>@(baseUrl)/api/rest/1</code></td>
+                        <td>Update a book by id</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge text-bg-danger">DELETE</span></td>
+                        <td><code>@(baseUrl)/api/rest/1</code></td>
+                        <td>Delete a book by id</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,103 @@
+@model List<mvc.Models.UserListViewModel>
+
+@{
+    ViewData["Title"] = "User Management";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">User management</h1>
+    <a asp-action="Create" class="btn btn-primary">Create new user</a>
+</div>
+
+@if (TempData["UserSuccess"] != null)
+{
+    <div class="alert alert-success" role="alert">@TempData["UserSuccess"]</div>
+}
+@if (TempData["UserError"] != null)
+{
+    <div class="alert alert-danger" role="alert">@TempData["UserError"]</div>
+}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th scope="col">Email</th>
+                    <th scope="col">Roles</th>
+                    <th scope="col">Email confirmed</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in Model)
+                {
+                    <tr>
+                        <td>@user.Email</td>
+                        <td>
+                            @if (user.IsAdmin)
+                            {
+                                <span class="badge text-bg-danger">Admin</span>
+                            }
+                            @if (user.IsMember)
+                            {
+                                <span class="badge text-bg-primary">Member</span>
+                            }
+                            @if (!user.IsAdmin && !user.IsMember)
+                            {
+                                <span class="text-body-secondary">None</span>
+                            }
+                        </td>
+                        <td>
+                            @if (user.EmailConfirmed)
+                            {
+                                <span class="badge text-bg-success">Yes</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">No</span>
+                            }
+                        </td>
+                        <td>
+                            @if (user.IsLockedOut)
+                            {
+                                <span class="badge text-bg-dark">Locked</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">Active</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2 flex-wrap">
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@user.Id">Details</a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@user.Id">Edit</a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="ResetPassword" asp-route-id="@user.Id">Reset password</a>
+                                <form asp-action="ToggleRole" asp-route-id="@user.Id" asp-route-role="Admin" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm @(user.IsAdmin ? "btn-outline-warning" : "btn-outline-primary")">
+                                        @(user.IsAdmin ? "Remove Admin" : "Make Admin")
+                                    </button>
+                                </form>
+                                <form asp-action="ToggleRole" asp-route-id="@user.Id" asp-route-role="Member" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">
+                                        @(user.IsMember ? "Remove Member" : "Make Member")
+                                    </button>
+                                </form>
+                                <form asp-action="ToggleLockout" asp-route-id="@user.Id" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm @(user.IsLockedOut ? "btn-outline-success" : "btn-outline-warning")">
+                                        @(user.IsLockedOut ? "Unlock" : "Lock")
+                                    </button>
+                                </form>
+                                <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@user.Id">Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

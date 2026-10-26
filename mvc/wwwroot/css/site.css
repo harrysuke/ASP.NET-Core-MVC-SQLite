@@ -1,0 +1,188 @@
+/* Global styling — theme-aware via Bootstrap 5.3 CSS variables.
+   Everything inherits from [data-bs-theme] set on <html>. */
+
+html {
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* Headings avoid orphaned last words. */
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+}
+
+/* Numeric columns and KPI figures align neatly in tables. */
+.tabular-nums,
+.display-1, .display-2, .display-3, .display-4, .display-5, .display-6,
+.table td, .table th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Anchored from the fixed header. */
+h1[id], h2[id], h3[id], h4[id], h5[id], h6[id], section[id] {
+  scroll-margin-top: 5rem;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  margin-bottom: 60px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+
+main {
+  padding-top: 0.5rem;
+}
+
+/* Skip link: keyboard-accessible, off-screen until focused. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  z-index: 1080;
+}
+
+.skip-link:focus {
+  left: 0;
+  top: 0;
+  background-color: var(--bs-body-bg);
+  color: var(--bs-link-color);
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0 0 var(--bs-border-radius) 0;
+  outline: 2px solid var(--bs-focus-ring-color, #0d6efd);
+  outline-offset: -2px;
+}
+
+/* Smooth color-mode transitions for common surfaces. */
+@media (prefers-reduced-motion: no-preference) {
+  .card,
+  .navbar,
+  aside,
+  footer,
+  .list-group-item,
+  thead th {
+    transition: background-color 0.15s ease-in-out,
+                border-color 0.15s ease-in-out,
+                color 0.15s ease-in-out;
+  }
+}
+
+/* Sidebar. */
+.sidebar {
+  min-height: calc(100vh - 140px);
+  background-color: var(--bs-body-bg);
+}
+
+.sidebar .nav-link {
+  color: var(--bs-body-color);
+  border-radius: var(--bs-border-radius);
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.125rem;
+}
+
+.sidebar .nav-link:hover {
+  background-color: var(--bs-tertiary-bg);
+  color: var(--bs-body-color);
+}
+
+.sidebar .sidebar-heading {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--bs-secondary-color);
+}
+
+/* Theme toggle: show the moon in light mode (tap to switch to dark),
+   and the sun in dark mode. Icons are swapped with CSS only. */
+.theme-toggle {
+  color: var(--bs-body-color);
+  border-color: var(--bs-border-color);
+}
+
+.theme-toggle:hover {
+  background-color: var(--bs-tertiary-bg);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.theme-icon-sun {
+  display: block;
+}
+
+.theme-icon-moon {
+  display: none;
+}
+
+[data-bs-theme="dark"] .theme-icon-sun {
+  display: none;
+}
+
+[data-bs-theme="dark"] .theme-icon-moon {
+  display: block;
+}
+
+.theme-toggle:focus-visible,
+.sidebar .nav-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 0.25rem var(--bs-focus-ring-color, rgba(13, 110, 253, 0.25));
+}
+
+/* Tables inherit Bootstrap 5.3 scheme colors; keep hover affordance subtle. */
+.table {
+  --bs-table-bg: transparent;
+}
+
+.table > :not(caption) > * > * {
+  border-bottom-width: 1px;
+}
+
+/* Landing hero band. */
+.hero-cover {
+  position: relative;
+  padding: 3rem 1rem;
+  border-radius: var(--bs-border-radius-lg);
+  background-color: var(--bs-primary);
+  background-image: linear-gradient(135deg, var(--bs-primary) 0%, color-mix(in srgb, var(--bs-primary) 60%, black) 100%);
+  color: #fff;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+}
+
+/* Keep white text at AA contrast (>= 4.5:1) over the primary band. */
+.hero-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.hero-cover > .container {
+  position: relative;
+}
+
+.hero-cover .btn-outline-light:not(:hover) {
+  color: #fff;
+}
+
+.hero-cover .btn-outline-light {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.hero-cover .btn-outline-light:hover {
+  color: var(--bs-primary);
+  border-color: #fff;
+}

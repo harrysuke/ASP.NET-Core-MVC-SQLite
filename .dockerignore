@@ -1,0 +1,33 @@
+# Build context is the repository root, but only mvc/ is needed.
+**/bin/
+**/obj/
+**/TestResults/
+
+# Local build/IDE state
+.vs/
+.vscode/
+.idea/
+**/*.user
+**/*.suo
+
+# The runtime database must never be baked into an image
+**/booksDb.sqlite
+**/*.sqlite
+**/*.sqlite-shm
+**/*.sqlite-wal
+**/*.db-shm
+**/*.db-wal
+
+# Not needed to build or run the app
+.git/
+.github/
+docs/
+mvctest/
+**/*.md
+LICENSE
+.gitattributes
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml

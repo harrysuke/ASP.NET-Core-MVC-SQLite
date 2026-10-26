@@ -1,0 +1,133 @@
+@model List<mvc.Models.AuditLog>
+
+@{
+    ViewData["Title"] = "Audit Log";
+    var userStr = ViewData["SearchUser"]?.ToString();
+    var actionStr = ViewData["SearchAction"]?.ToString();
+    var fromStr = ((DateTime?)ViewData["SearchFrom"])?.ToString("yyyy-MM-dd");
+    var toStr = ((DateTime?)ViewData["SearchTo"])?.ToString("yyyy-MM-dd");
+    var successStr = ViewData["SearchSuccess"]?.ToString();
+}
+
+<h1 class="h3 mb-3">Audit log</h1>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-sm-auto">
+                <label class="form-label">User</label>
+                <input type="text" name="user" value="@userStr" class="form-control" placeholder="email contains..." />
+            </div>
+            <div class="col-12 col-sm-auto">
+                <label class="form-label">Action</label>
+                <input type="text" name="actionName" value="@actionStr" class="form-control" placeholder="e.g. Login, Create" />
+            </div>
+            <div class="col-6 col-sm-auto">
+                <label class="form-label">From</label>
+                <input type="date" name="from" value="@fromStr" class="form-control" />
+            </div>
+            <div class="col-6 col-sm-auto">
+                <label class="form-label">To</label>
+                <input type="date" name="to" value="@toStr" class="form-control" />
+            </div>
+            <div class="col-6 col-sm-auto">
+                <label class="form-label">Status</label>
+                <select name="success" class="form-select">
+                    <option value="">Any</option>
+                    <option value="true" selected="@((bool?)ViewData["SearchSuccess"] == true)">Success</option>
+                    <option value="false" selected="@((bool?)ViewData["SearchSuccess"] == false)">Failure</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-auto d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Filter</button>
+                <form asp-action="ExportCsv" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="user" value="@userStr" />
+                    <input type="hidden" name="actionName" value="@actionStr" />
+                    <input type="hidden" name="from" value="@fromStr" />
+                    <input type="hidden" name="to" value="@toStr" />
+                    <input type="hidden" name="success" value="@successStr" />
+                    <button type="submit" class="btn btn-outline-secondary">Export CSV</button>
+                </form>
+            </div>
+        </form>
+    </div>
+</div>
+
+<p class="text-body-secondary">
+    @ViewData["Total"] entries &middot; page @ViewData["CurrentPage"] of @ViewData["TotalPages"]
+</p>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th scope="col">Time (UTC)</th>
+                    <th scope="col">User</th>
+                    <th scope="col">Controller / Action</th>
+                    <th scope="col">Method</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">IP</th>
+                    <th scope="col">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Model)
+                {
+                    <tr>
+                        <td>@entry.TimestampUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@entry.UserName</td>
+                        <td>@entry.Controller / @entry.Action</td>
+                        <td>@entry.HttpMethod</td>
+                        <td>
+                            @if (entry.Success)
+                            {
+                                <span class="badge text-bg-success">OK</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-danger">Fail</span>
+                            }
+                        </td>
+                        <td>@entry.IpAddress</td>
+                        <td>@entry.Details</td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-body-secondary">No audit entries found.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<nav class="mt-3">
+    <ul class="pagination">
+        @{
+            var currentPage = (int)ViewData["CurrentPage"]!;
+            var totalPages = (int)ViewData["TotalPages"]!;
+        }
+        @if (currentPage > 1)
+        {
+            <li class="page-item">
+                <a class="page-link" asp-action="Index" asp-route-user="@userStr" asp-route-actionName="@actionStr" asp-route-from="@fromStr" asp-route-to="@toStr" asp-route-success="@successStr" asp-route-page="@(currentPage - 1)">Previous</a>
+            </li>
+        }
+        @for (int p = 1; p <= totalPages; p++)
+        {
+            <li class="page-item @(p == currentPage ? "active" : "")">
+                <a class="page-link" asp-action="Index" asp-route-user="@userStr" asp-route-actionName="@actionStr" asp-route-from="@fromStr" asp-route-to="@toStr" asp-route-success="@successStr" asp-route-page="@p">@p</a>
+            </li>
+        }
+        @if (currentPage < totalPages)
+        {
+            <li class="page-item">
+                <a class="page-link" asp-action="Index" asp-route-user="@userStr" asp-route-actionName="@actionStr" asp-route-from="@fromStr" asp-route-to="@toStr" asp-route-success="@successStr" asp-route-page="@(currentPage + 1)">Next</a>
+            </li>
+        }
+    </ul>
+</nav>

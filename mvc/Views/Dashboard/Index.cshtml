@@ -1,0 +1,38 @@
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<h1 class="h3 mb-4">Dashboard</h1>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card text-bg-primary h-100">
+            <div class="card-body">
+                <h5 class="card-title">Books</h5>
+                <p class="card-text">Browse and manage the book catalogue.</p>
+                <a asp-controller="Book" asp-action="Index" class="btn btn-light mt-2">Go to books</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-bg-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">API</h5>
+                <p class="card-text">Explore the REST API endpoints.</p>
+                <a asp-controller="Home" asp-action="Api" class="btn btn-light mt-2">View API</a>
+            </div>
+        </div>
+    </div>
+    @if (User?.IsInRole("Admin") == true)
+    {
+        <div class="col-md-4">
+            <div class="card text-bg-primary h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Users</h5>
+                    <p class="card-text">Create and manage user accounts and roles.</p>
+                    <a asp-controller="User" asp-action="Index" class="btn btn-light mt-2">Manage users</a>
+                </div>
+            </div>
+        </div>
+    }
+</div>
